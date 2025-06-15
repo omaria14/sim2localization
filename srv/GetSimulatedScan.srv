@@ -1,0 +1,5 @@
+# This service requests ...
+
+string sensor
+---
+sensor_msgs/PointCloud2 simulated_scan

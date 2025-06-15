@@ -1,0 +1,5 @@
+# This service requests ...
+
+geometry_msgs/Pose pose 
+---
+bool success

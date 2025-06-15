@@ -1,0 +1,25 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+
+# VS Code settings
+.vscode/
+
+# Logs
+*.log
+
+# Environment/config files
+.env
+*.env
+
+# Python compiled files
+*.pyo
+*.pyd
+
+# Build directories
+dist/
+build/
