@@ -2,8 +2,8 @@ import rospy
 from gazebo_msgs.srv import SetModelState
 from sensor_msgs.msg import PointCloud2
 from gazebo_msgs.msg import ModelState
-from weighted_icp.srv import GetSimulatedScan
-from weighted_icp.srv import TransformSensor
+from sim2localization.srv import GetSimulatedScan
+from sim2localization.srv import TransformSensor
 import tf
 
 class SimulatedScansHandler:

@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 
 def segment_dbscan(input_cloud, eps=0.5, min_points=10, min_cluster_points=40):
-    # WIP: DBSCAN
     # segment outlier cloud using DBSCAN algorithm
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
         labels = np.array(copy.deepcopy(input_cloud).cluster_dbscan(eps=eps, min_points=min_points, print_progress=False))

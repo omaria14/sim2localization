@@ -1,7 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-  <env name="GAZEBO_RESOURCE_PATH" value="$(find weighted_icp)/gazebo_worlds:$(optenv GAZEBO_RESOURCE_PATH)"/>
-  <!--env name="GAZEBO_MODEL_PATH" value="$(find weighted_icp)/gazebo_models:$(optenv GAZEBO_MODEL_PATH)"/-->
+  <env name="GAZEBO_RESOURCE_PATH" value="$(find sim2localization)/gazebo_worlds:$(optenv GAZEBO_RESOURCE_PATH)"/>
   
   <arg name="paused" default="false"/>
   <arg name="use_sim_time" default="true"/>
@@ -9,7 +8,7 @@
   <arg name="headless" default="false"/>
   <arg name="debug" default="false"/>
   <arg name="verbose" default="false"/>
-  <arg name="world_name" default="empty_world.world"/>
+  <arg name="world_name" default="base_world.world"/>
 
   <!-- Start gazebo and load the world -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch" >
@@ -22,19 +21,9 @@
     <arg name="world_name" value="$(arg world_name)"/>
   </include>
 
- 
-
-  <!--Spawn the map -->
-  <node pkg="gazebo_ros" type="spawn_model" name="spawn_map" args="-urdf -file $(find weighted_icp)/gazebo_models/map/map.urdf -model map"/>
-  <param name="map_description" textfile="$(find weighted_icp)/gazebo_models/map/map.urdf"/>
-  <node pkg="robot_state_publisher" type="robot_state_publisher" name="map_state_publisher">
-    <remap from="robot_description" to="map_description" />
-    <remap from="joint_states" to="map_joint_states" />
-  </node>
-
   <!-- Spawn the sensor -->
   <arg name="gpu" default="false"/>
-  <param name="sensor_description" command="$(find xacro)/xacro --inorder '$(find weighted_icp)/gazebo_models/sensor/sensor.urdf.xacro' gpu:=$(arg gpu)" />
+  <param name="sensor_description" command="$(find xacro)/xacro --inorder '$(find sim2localization)/gazebo_models/sensor/sensor.urdf.xacro' gpu:=$(arg gpu)" />
   <node pkg="gazebo_ros" type="spawn_model" name="spawn_model" args="-urdf -param /sensor_description -model velodyne"/>
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="sensor_state_publisher">
     <param name="publish_frequency" type="double" value="30.0" />
@@ -48,6 +37,6 @@
 
   <!-- RViz -->
   <arg name="rviz" default="true"/>
-  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="$(anon rviz)" respawn="false" output="screen" args="-d $(find weighted_icp)/rviz/sensor.rviz" />
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="$(anon rviz)" respawn="false" output="screen" args="-d $(find sim2localization)/rviz/sensor.rviz" />
 
 </launch>

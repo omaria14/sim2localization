@@ -6,15 +6,27 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 
 class Segment:
-    def __init__(self, pcd, camera_location) -> None:
+    """
+    Considers a Point Cloud Segment, implement basic methods and saves required member variables.
+    """
+    def __init__(self, id, pcd, camera_location) -> None:
+        self.id = id
         self.pcd = pcd
         self.pcd_points = np.asarray(pcd.points)
         self.camera_location = camera_location
         self.set_dominant_range_mean()
         self.set_principal_dim()
+        self.mean = np.mean(self.pcd_points)
 
     
     def set_dominant_range_mean(self, percentage=0.80):
+        """
+        Sets the mean of the segment point cloud considering a percentage of the points
+        along X,Y,Z axes to avoid outliers effect on the mean.
+
+        Args:
+            percentage(float): percentage of points to be considered.
+        """
         num_points = self.pcd_points.shape[0]
         num_included_points = int(np.floor(percentage * num_points))
         # Find ranges for each axis
@@ -32,6 +44,13 @@ class Segment:
         return True
 
     def set_principal_dim(self, percentage=0.80):
+        """
+        Calculates the segment length, width and height along its principal axes. Considers only
+        percentage of the points to avoid outliers effect.
+
+        Args:
+            percentage(float): percentage of points to be considered.
+        """
         pca = PCA(n_components=3)
         pca.fit(self.pcd_points)
         transformed_points = pca.transform(copy.deepcopy(self.pcd_points))
@@ -53,6 +72,19 @@ class Segment:
 
     @staticmethod
     def get_histogram_of_normals(pcd, camera_location, bins=6):
+        """
+        Calculates a global feature for the segment based on normals. The feature is a histogram of
+        angles between local normals and the mean direction of all normals.
+        @todo make angles between local normals and a dominant direction of the local normals
+        (direction with highest number of local normal pointing to it)(not the mean).
+
+        Args:
+        camera_location(list[float]): location to orient normals
+        pins(int): number of pins in the histogram
+
+        Returns:
+            angle_histogram(numpy.ndarray): resultant histogram as a global feature
+        """
         pcd.estimate_normals()
         pcd.orient_normals_towards_camera_location(camera_location=camera_location)
         pcd.normalize_normals()
@@ -85,48 +117,39 @@ class Segment:
         return angle_histogram
 
 
-class SourceSegment(Segment):
-    def __init__(self, pcd, camera_location) -> None:
-        super().__init__(pcd, camera_location)
-        self.similar_segments = []
-        self.highest_weight = 0
-        
-    def add_similar_segment(self, weight, target_cloud):
-        self.similar_segments.append((weight, target_cloud))
-    
-    def set_highest_weight(self):
-        if len(self.similar_segments) < 1:
-            return
-        max_sublist = max(self.similar_segments, key=lambda x: x[0])
-        max_weight = max_sublist[0]
-        self.highes_weight = max_weight
-        return
-
-
 
 
 class TargetSegment(Segment):
-    def __init__(self, pcd, camera_location, similarity_search_offset, training=False) -> None:
-        super().__init__(pcd, camera_location)
-        self.set_size_class()
+    """
+    Inherits from Segment.
+    """
+    def __init__(self, id, pcd, camera_location) -> None:
+        super().__init__(id, pcd, camera_location)
+
+
+class SourceSegment(Segment):
+    """
+    Inherits from Segment. Adds some needed member variables and methods for source segments.
+    """
+    def __init__(self, id, pcd, camera_location, similarity_search_offset) -> None:
+        super().__init__(id, pcd, camera_location)
         self.similarity_search_offset = similarity_search_offset
         self.similar_candidates = []
         self.similar_candidates_feature_vectors = []
+        self.similar_candidates_classification_results = [] 
+        # probabilities [[not_sinimlar_prob, similar_prob],...] as the classes are ints:
+        #  0 -> not similar , 1 -> similar .. they are ordered automatically
+        self.highest_score = 0
         
-        # for training ..
-        self.training = training
-        self.similar_candidates_labels = []
-    
-    def set_size_class(self, length_threshold=2.0, width_threshold=1.5):
-        if self.length > length_threshold and self.width > width_threshold:
-            self.size_class = "large"
-        else:
-            self.size_class = "small"
-        print(f"Size Class: {self.size_class}, Length: {self.length}, Width: {self.width}")
-            
-    
-    def get_similar_segments_candidates(self, lst_other_segments):
-        for segment in lst_other_segments:
+    def get_similar_segments_candidates(self, lst_target_segments):
+        """
+        Gets a list of nearby target segments and sets them as a similar candidates to the 
+        self source segment in the map.
+
+        Args:
+            lst_target_segments(list[TargetSegment]): list of target segments
+        """
+        for segment in lst_target_segments:
         
             x1_mean, y1_mean, z1_mean = self.dominant_range_mean
             x2_mean, y2_mean, z2_mean = segment.dominant_range_mean
@@ -137,12 +160,25 @@ class TargetSegment(Segment):
 
             if x_check and y_check and z_check:
                 self.similar_candidates.append(segment)
-    
-    def calculate_candidates_similarity_feature_vector(self):
+        
+    def calculate_candidates_similarity_feature_vector(self, TRAINING=False):
+        """
+        Calculates a feature vector for each candidate target segment that encodes a similarity
+        between the self source segment and that target segment. Also provides interaction for 
+        training; returning labels and feature vectors to train a similarity classifier.
+
+        Args:
+            TRAINING(bool): If True, visualize the segments with o3d and allow labeling.
+
+        Returns:
+            self.similar_candidates_feature_vectors(list[list[float]]): list of feature vectors
+            Y(list[int]): corresponding labels; 0->not similar, 1->similar
+
+        """
         Y = []  # labels to be used along self.similar_candidates_feature_vectors if self.training!
         # ensure no old data .. 
         self.similar_candidates_feature_vectors = []
-        self.similar_candidates_labels = []
+        self.similar_candidates_classification_results = []
         
         for i in range(len(self.similar_candidates)):
             H1 = self.get_histogram_of_normals(self.pcd, camera_location=self.camera_location)
@@ -153,14 +189,20 @@ class TargetSegment(Segment):
                                                             min(self.length,self.similar_candidates[i].length)/max(self.length,self.similar_candidates[i].length),
                                                             min(self.length,self.similar_candidates[i].width)/max(self.length,self.similar_candidates[i].width)]) 
 
-            if self.training:
-                o3d.visualization.draw_geometries([self.pcd, self.similar_candidates[i].pcd], f"Choose a Label! - Size Class: {self.size_class}")
+            if TRAINING:
+                o3d.visualization.draw_geometries([self.pcd, self.similar_candidates[i].pcd], f"Choose a Label!")
                 label = input("Enter The Label, 1 -> Similar, 0 -> Not Similar, S -> Skip")
                 if label != "0" and label != "1":
                     self.similar_candidates_feature_vectors.pop()
                 else:
                     Y.append(float(label))
                     print("Label:", Y[-1], " Feature Vector: ",  self.similar_candidates_feature_vectors[-1])
-        return self.similar_candidates_feature_vectors,Y  # return feature vector and labels 
-
+        return self.similar_candidates_feature_vectors,Y  # return feature vector and labels
     
+    def set_highest_score(self):
+        """
+        Sets a highest similarity probability among existing similar candidates.
+        """
+        for i in range(len(self.similar_candidates_classification_results)):
+            if self.similar_candidates_classification_results[i][1]>self.highest_score:
+                self.highest_score = self.similar_candidates_classification_results[i][1]

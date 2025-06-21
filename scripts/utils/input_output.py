@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 import os
 import numpy as np
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Header
+from sensor_msgs.msg import PointField
+from sensor_msgs import point_cloud2
+import json
 
 def get_scan_paths(parent_path):
     """
@@ -31,7 +36,7 @@ def read_scan(scan_path):
     scan = np.asarray(scan)
     return scan, timestamps
 
-def get_init_guess_poses(file_path):
+def get_poses_from_file(file_path):
     """
     """
     poses = []
@@ -43,6 +48,31 @@ def get_init_guess_poses(file_path):
             pose = []
             for j in range (len(line_elements)):
                 pose.append(float(line_elements[j]))
-            pose = np.asarray(pose).reshape((4,4))
             poses.append(pose)
     return poses
+
+def save_source_scan_and_pose(source_scan, pose, file_path):
+    """
+    saves PointCloud2 and Pose
+    """
+    with open(file_path, 'w') as f:
+        points_list = point_cloud2.read_points_list(source_scan.simulated_scan, field_names=["x", "y", "z"])
+        points_list = [[point.x, point.y, point.z] for point in points_list]
+        json.dump({"points": points_list, "pose": pose}, f)
+
+def read_source_scan_and_pose(file_path, point_cloud_type="PointCloud2"):
+    """
+    return PointCloud2 or o3d.geometry.PointCloud() and Pose
+    """
+    with open(file_path, 'r') as f:
+        data = json.load( f)
+    points_list = data["points"]
+    fields = [
+    PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
+    PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
+    PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1)]
+    header = Header()
+    source_scan = point_cloud2.create_cloud(header, fields, points_list)
+    pose = data["pose"]
+    return source_scan, pose
+

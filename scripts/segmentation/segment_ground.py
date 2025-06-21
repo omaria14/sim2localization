@@ -5,10 +5,21 @@ import copy
 from scipy.spatial import cKDTree
 
 
-def segment_ground(pcd_input, distance_threshold=0.15, min_vert_ang=30, o3d_vis=True):
+def segment_ground(pcd_input, distance_threshold=0.15, min_vert_ang=30, o3d_vis=False):
     """
-    min_vert_angle: minimum angle between normal of the segmented plane and z axis to consider 
-        the plane as an almost-vertical plane.
+    Segments a ground from a given scan; dealing with oblique ground.
+
+    Args:
+        pcd_input(o3d.cpu.pybind.geometry.PointCloud): input scan
+        distance_threshold(float): RANSAC inliers threshold for plane segmentation
+        min_vert_angle(float): minimum angle between normal of the segmented plane and z axis to 
+            consider the plane as an almost-vertical plane.
+        o3d_vis(bool): if True: visualize algorithm steps.
+    
+    Returns:
+        plane_model(list[float]): ground parameters [a,b,c,d] ax+by+cz+d = 0
+        plane_inliers(o3d.cpu.pybind.geometry.PointCloud): ground point cloud
+
     """
     pcd = copy.deepcopy(pcd_input)
     ground_found = False
